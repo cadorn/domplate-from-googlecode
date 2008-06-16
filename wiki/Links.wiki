@@ -1,0 +1,7 @@
+= Implementations =
+
+  * http://plugins.jquery.com/project/domplate
+
+= Reference =
+
+  * http://www.softwareishard.com/blog/firebug-tutorial/extending-firebug-domplate-part-v/
