@@ -1,1 +1,2 @@
   * Cross-browser compatibility. Only seems to work in Firefox at the moment.
+  * Documentation
