@@ -175,7 +175,7 @@ DomplateTag.prototype =
 
             if (name.indexOf("on") == 0)
             {
-                var eventName = name.substr(2);
+                var eventName = jQuery.browser.msie ? name : name.substr(2);
                 if (!this.listeners)
                     this.listeners = [];
                 this.listeners.push(eventName, val);
@@ -305,7 +305,7 @@ DomplateTag.prototype =
             }
         }
 
-        var js = fnBlock.join("");
+        var js = jQuery.browser.msie ? 'var f = ' + fnBlock.join("") + ';f' : fnBlock.join("");
         this.renderMarkup = eval(js);
     },
 
@@ -512,7 +512,7 @@ DomplateTag.prototype =
             return parent;
         }
 
-        var js = fnBlock.join("");
+        var js = jQuery.browser.msie ? 'var f = ' + fnBlock.join("") + ';f' : fnBlock.join("");
         //ddd(js.replace(/(\;|\{)/g, "$1\n"));
         this.renderDOM = eval(js);
     },
@@ -528,7 +528,11 @@ DomplateTag.prototype =
             {
                 var val = this.listeners[i+1];
                 var arg = generateArg(val, path, args);
-                blocks.push('node.addEventListener("', this.listeners[i], '", __bind__(this, ', arg, '), false);');
+                if (window.addEventListener) {
+                    blocks.push('node.addEventListener("', this.listeners[i], '", __bind__(this, ', arg, '), false);');
+                } else if (window.attachEvent) {
+                    blocks.push('node.attachEvent("', this.listeners[i], '", __bind__(this, ', arg, '));');
+                }
             }
         }
 
