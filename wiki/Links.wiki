@@ -5,3 +5,4 @@
 = Reference =
 
   * http://www.softwareishard.com/blog/firebug-tutorial/extending-firebug-domplate-part-v/
+  * http://www.softwareishard.com/blog/firebug-tutorial/extending-firebug-yahoo-search-part-vi/
