@@ -33,7 +33,7 @@
 		}	
 	</script>
 	<!-- include domplate -->
-	<script src="domplate.js" type="text/javascript"></script>	
+	<script src="/libraries/domplate/domplate-debug.js" type="text/javascript"></script>	
 	<script type="text/javascript">	
 	
 		with (FBL) {

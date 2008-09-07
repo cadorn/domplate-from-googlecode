@@ -21,7 +21,7 @@ function DomplateLoop()
 
 var womb = null;
 
-domplate = function()
+top.domplate = function()
 {
     var lastSubject;
     for (var i = 0; i < arguments.length; ++i)
@@ -1034,4 +1034,3 @@ defineTags(
 );
 
 })();
-
