@@ -1,0 +1,8 @@
+
+-----------------------------------------
+ Install
+-----------------------------------------
+
+You need to create an apache alias:
+
+Alias /libraries/   ./../libraries/
