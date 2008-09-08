@@ -47,32 +47,36 @@
 					
 			arrayTable:
 				TABLE({border:1},
-					TR(
-						TH({colspan:2},'array')
-					),				
-					FOR('x','$value',
-						TR(
-							TD('$x.name'),
-							TD(
-								TAG('$x.val|format',{value:'$x.val|parseParts'})
-							)							
-						)
-					)						
+					TBODY(
+            TR(
+  						TH({colspan:2},'array')
+  					),				
+  					FOR('x','$value',
+  						TR(
+  							TD('$x.name'),
+  							TD(
+  								TAG('$x.val|format',{value:'$x.val|parseParts'})
+  							)							
+  						)
+  					)
+          )						
 				),
 						
 			structTable:
 				TABLE({border:1},
-					TR(
-						TH({colspan:2},'struct')
-					),				
-					FOR('x','$value',
-						TR(
-							TD('$x.name'),
-							TD(
-								TAG('$x.val|format',{value:'$x.val|parseParts'})
-							)							
-						)
-					)						
+          TBODY(        
+  					TR(
+  						TH({colspan:2},'struct')
+  					),				
+  					FOR('x','$value',
+  						TR(
+  							TD('$x.name'),
+  							TD(
+  								TAG('$x.val|format',{value:'$x.val|parseParts'})
+  							)							
+  						)
+  					)
+          )
 				),
 				
 			simpleDiv:
