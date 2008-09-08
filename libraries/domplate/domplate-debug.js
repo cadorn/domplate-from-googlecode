@@ -538,33 +538,16 @@ DomplateTag.prototype =
 
             for (var i = 2; i < arguments.length; ++i)
             {
-                DomplateDebug.logVar(' .. i',i);
-
                 var index = arguments[i];
-                DomplateDebug.logVar('   .. index.old',index);
 
                 if (i == 3)
                     index += offset;
 
-                DomplateDebug.logVar('   .. index.new',index);
-
-                DomplateDebug.logVar('   .. parent.old',parent);
-                DomplateDebug.logVar('   .. parent.old.parentNode',parent.parentNode);
-                DomplateDebug.logVar('   .. parent.old.childNodes',parent.childNodes);
-                DomplateDebug.logVar('   .. parent.old.tagName',parent.tagName.toUpperCase());
-
                 if (index == -1) {
                     parent = parent.parentNode;
-                } else
-                if(parent.tagName.toUpperCase()=='TABLE' &&
-                   parent.childNodes[0].tagName.toUpperCase()=='TBODY') {
-                       
-                    parent = parent.childNodes[0].childNodes[index];
                 } else {
                     parent = parent.childNodes[index];
                 }    
-
-                DomplateDebug.logVar('   .. parent.new',parent);
             }
 
             if (FBTrace.DBG_DOM) FBTrace.sysout("domplate: "+arguments[2]+", root: "+ root+", parent: "+ parent+"\n");
