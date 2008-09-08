@@ -153,6 +153,9 @@
 		function runTest(){
 			
 			with (FBL){		
+      
+        DomplateDebug.enabled = true;
+      
 				var testVar = [{"__cftype__":"struct","keyOne":"valueOne","keyTwo":"valueTwo"},"item two","item three"];			
 				formatter.dump.append({value:testVar}, $("test"));			
 			}
