@@ -3,6 +3,6 @@
  Install
 -----------------------------------------
 
-You need to create an apache alias:
+You need to create an apache alias as follows (replace the relative target path):
 
 Alias /libraries/   ./../libraries/
