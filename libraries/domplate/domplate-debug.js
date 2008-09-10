@@ -1,5 +1,15 @@
 /* See license.txt for terms of usage */
 
+/*
+ * Modifications by Christoph Dorn <christoph@christophdorn.com>:
+ * 
+ * Sep  7, 2008: Added DomplateDebug logging
+ * Sep 10, 2008: Added support for multiple function arguments
+ * 
+ * 
+ * 
+ */
+
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
 function DomplateTag(tagName)
@@ -19,7 +29,7 @@ function DomplateLoop()
 
 (function() {
 
-// * DEBUG * * ( Christoph Dorn <christoph@christophdorn.com> )  * * * * * * * * * * * * * * * * *
+// * DEBUG * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 top.DomplateDebug = {
   
   enabled: false,
@@ -157,8 +167,13 @@ DomplateTag.prototype =
 
     parseAttrs: function(args)
     {
+        DomplateDebug.startGroup('DomplateTag.parseAttrs',arguments);
+
         for (var name in args)
         {
+            DomplateDebug.logVar('name',name);
+            DomplateDebug.logVar('args[name]',args[name]);
+
             var val = parseValue(args[name]);
             readPartNames(val, this.vars);
 
@@ -191,6 +206,8 @@ DomplateTag.prototype =
                     this.attrs[name] = val;
             }
         }
+
+        DomplateDebug.endGroup();
     },
 
     compile: function()
@@ -634,6 +651,8 @@ DomplateEmbed.prototype = copyObject(DomplateTag.prototype,
 {
     merge: function(args, oldTag)
     {
+        DomplateDebug.startGroup('DomplateEmbed.merge',arguments);
+
         this.value = oldTag ? oldTag.value : parseValue(args[0]);
         this.attrs = oldTag ? oldTag.attrs : {};
         this.vars = oldTag ? copyArray(oldTag.vars) : [];
@@ -646,7 +665,11 @@ DomplateEmbed.prototype = copyObject(DomplateTag.prototype,
             readPartNames(val, this.vars);
         }
 
-        return creator(this, DomplateEmbed);
+        var retval = creator(this, DomplateEmbed);
+        
+        DomplateDebug.endGroup();
+
+        return retval;        
     },
 
     getVarNames: function(names)
@@ -711,6 +734,8 @@ DomplateLoop.prototype = copyObject(DomplateTag.prototype,
 {
     merge: function(args, oldTag)
     {
+        DomplateDebug.startGroup('DomplateLoop.merge',arguments);
+
         this.varName = oldTag ? oldTag.varName : args[0];
         this.iter = oldTag ? oldTag.iter : parseValue(args[1]);
         this.vars = [];
@@ -721,6 +746,8 @@ DomplateLoop.prototype = copyObject(DomplateTag.prototype,
         parseChildren(args, offset, this.vars, this.children);
 
         return creator(this, DomplateLoop);
+
+        DomplateDebug.endGroup();
     },
 
     getVarNames: function(names)
@@ -733,16 +760,27 @@ DomplateLoop.prototype = copyObject(DomplateTag.prototype,
 
     generateMarkup: function(topBlock, topOuts, blocks, info)
     {
+        DomplateDebug.startGroup('DomplateLoop.generateMarkup',arguments);
+
         this.addCode(topBlock, topOuts, blocks);
+
+        DomplateDebug.logVar('this.iter',this.iter);
 
         var iterName;
         if (this.iter instanceof Parts)
         {
             var part = this.iter.parts[0];
-            iterName = part.name;
+            
+            if(part.names) {
+              iterName = part.names.join(',');
+            } else {
+              iterName = part.name;
+            }
 
             if (part.format)
             {
+                DomplateDebug.logVar('part.format',part.format);
+        
                 for (var i = 0; i < part.format.length; ++i)
                     iterName = part.format[i] + "(" + iterName + ")";
             }
@@ -750,10 +788,14 @@ DomplateLoop.prototype = copyObject(DomplateTag.prototype,
         else
             iterName = this.iter;
 
+        DomplateDebug.logVar('iterName',iterName);
+
         blocks.push('__loop__.apply(this, [', iterName, ', __out__, function(', this.varName, ', __out__) {');
         this.generateChildMarkup(topBlock, topOuts, blocks, info);
         this.addCode(topBlock, topOuts, blocks);
         blocks.push('}]);');
+
+        DomplateDebug.endGroup();
     },
 
     generateDOM: function(path, blocks, args)
@@ -814,6 +856,12 @@ function Variable(name, format)
     this.format = format;
 }
 
+function Variables(format)
+{
+    this.format = format;
+    this.names = [];
+}
+
 function Parts(parts)
 {
     this.parts = parts;
@@ -823,30 +871,83 @@ function Parts(parts)
 
 function parseParts(str)
 {
-    var re = /\$([_A-Za-z][_A-Za-z0-9.|]*)/g;
+    DomplateDebug.startGroup('parseParts',arguments);
+    
     var index = 0;
     var parts = [];
 
+    var n;
+    var recN = /^\(([,$_A-Za-z0-9.]*)\)\|([_A-Za-z0-9]*)$/;
+    var o;
+    var recO = /(,?\$[_A-Za-z][_A-Za-z0-9.|]*)/;
+    var v;
+
+    // Match ($var1,$var2)|func
     var m;
-    while (m = re.exec(str))
+    var recM = /\([$_A-Za-z0-9.,]*\)\|[_A-Za-z0-9]*/g;
+    while (m = recM.exec(str))
     {
-        var pre = str.substr(index, (re.lastIndex-m[0].length)-index);
+        var pre = str.substr(index, (recM.lastIndex-m[0].length)-index);
         if (pre)
             parts.push(pre);
 
-        var expr = m[1].split("|");
-        parts.push(new Variable(expr[0], expr.slice(1)));
-        index = re.lastIndex;
+        // Split out the variables and function name
+        if(n = m[0].match(recN)) {
+
+          // Now finally the variables
+          var vars = n[1].split(",");
+
+          // Assemble the variables object          
+          v = new Variables([n[2]]);
+          for( var i in vars ) {
+            v.names.push(vars[i].substr(1));            
+          }
+        
+          parts.push(v);
+        }
+        
+        index = recM.lastIndex;
+    }
+        
+    if(!index) {
+
+      // Match $var1|func
+      var re = /\$([_A-Za-z][_A-Za-z0-9.|]*)/g;
+      while (m = re.exec(str))
+      {
+          var pre = str.substr(index, (re.lastIndex-m[0].length)-index);
+          if (pre)
+              parts.push(pre);
+  
+          var expr = m[1].split("|");
+          parts.push(new Variable(expr[0], expr.slice(1)));
+          index = re.lastIndex;
+      }
     }
 
-    if (!index)
-        return str;
+    // No matches found at all so we return the whole string
+    if (!index) {
 
+        DomplateDebug.logVar('str',str);
+        
+        DomplateDebug.endGroup();
+    
+        return str;
+    }
+
+    // If we have data after our last matched index we append it here as the final step
     var post = str.substr(index);
     if (post)
         parts.push(post);
 
-    return new Parts(parts);
+
+    var retval = new Parts(parts);
+    
+    DomplateDebug.logVar('retval',retval);
+    
+    DomplateDebug.endGroup();
+    
+    return retval;
 }
 
 function parseValue(val)
@@ -856,12 +957,15 @@ function parseValue(val)
 
 function parseChildren(args, offset, vars, children)
 {
+    DomplateDebug.startGroup('parseChildren',arguments);
+
     for (var i = offset; i < args.length; ++i)
     {
         var val = parseValue(args[i]);
         children.push(val);
         readPartNames(val, vars);
     }
+    DomplateDebug.endGroup();
 }
 
 function readPartNames(val, vars)
