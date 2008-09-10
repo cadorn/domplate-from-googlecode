@@ -352,9 +352,9 @@ DomplateTag.prototype =
             {
                 for (var i = 0; i < child.parts.length; ++i)
                 {
-                    if (child.parts[i] instanceof Variable)
+                    if (child.parts[i] instanceof Variables)
                     {
-                        var name = child.parts[i].name;
+                        var name = child.parts[i].names[0];
                         var names = name.split(".");
                         args.push(names[0]);
                     }
@@ -766,17 +766,25 @@ DomplateLoop.prototype = copyObject(DomplateTag.prototype,
 
         DomplateDebug.logVar('this.iter',this.iter);
 
+        // We are in a FOR loop and our this.iter property contains
+        // either a simple function name as a string or a Parts object
+        // with only ONE Variables object. There is only one variables object
+        // as the FOR argument can contain only ONE valid function callback
+        // with optional arguments or just one variable. Allowed arguments are
+        // func or $var or $var.sub or $var|func or $var1,$var2|func or $var|func1|func2 or $var1,$var2|func1|func2
         var iterName;
         if (this.iter instanceof Parts)
         {
+            // We have a function with optional aruments or just one variable
             var part = this.iter.parts[0];
             
-            if(part.names) {
-              iterName = part.names.join(',');
-            } else {
-              iterName = part.name;
-            }
+            // Join our function arguments or variables
+            // If the user has supplied multiple variables without a function
+            // this will create an invalid result and we should probably add an
+            // error message here or just take the first variable
+            iterName = part.names.join(',');
 
+            // Nest our functions
             if (part.format)
             {
                 DomplateDebug.logVar('part.format',part.format);
@@ -784,10 +792,11 @@ DomplateLoop.prototype = copyObject(DomplateTag.prototype,
                 for (var i = 0; i < part.format.length; ++i)
                     iterName = part.format[i] + "(" + iterName + ")";
             }
-        }
-        else
+        } else {
+            // We have just a simple function name without any arguments
             iterName = this.iter;
-
+        }
+        
         DomplateDebug.logVar('iterName',iterName);
 
         blocks.push('__loop__.apply(this, [', iterName, ', __out__, function(', this.varName, ', __out__) {');
@@ -850,16 +859,10 @@ DomplateLoop.prototype = copyObject(DomplateTag.prototype,
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
-function Variable(name, format)
+function Variables(names,format)
 {
-    this.name = name;
+    this.names = names;
     this.format = format;
-}
-
-function Variables(format)
-{
-    this.format = format;
-    this.names = [];
 }
 
 function Parts(parts)
@@ -875,54 +878,25 @@ function parseParts(str)
     
     var index = 0;
     var parts = [];
-
-    var n;
-    var recN = /^\(([,$_A-Za-z0-9.]*)\)\|([_A-Za-z0-9]*)$/;
-    var o;
-    var recO = /(,?\$[_A-Za-z][_A-Za-z0-9.|]*)/;
-    var v;
-
-    // Match ($var1,$var2)|func
     var m;
-    var recM = /\([$_A-Za-z0-9.,]*\)\|[_A-Za-z0-9]*/g;
-    while (m = recM.exec(str))
+
+    // Match $var or $var.sub or $var|func or $var1,$var2|func or $var|func1|func2 or $var1,$var2|func1|func2
+    var re = /\$([_A-Za-z][$_A-Za-z0-9.,|]*)/g;
+    while (m = re.exec(str))
     {
-        var pre = str.substr(index, (recM.lastIndex-m[0].length)-index);
+        DomplateDebug.logVar('m',m);
+
+        var pre = str.substr(index, (re.lastIndex-m[0].length)-index);
         if (pre)
             parts.push(pre);
 
-        // Split out the variables and function name
-        if(n = m[0].match(recN)) {
+        var segs = m[1].split("|");
+        var vars = segs[0].split(",$");
 
-          // Now finally the variables
-          var vars = n[1].split(",");
-
-          // Assemble the variables object          
-          v = new Variables([n[2]]);
-          for( var i in vars ) {
-            v.names.push(vars[i].substr(1));            
-          }
+        // Assemble the variables object and append to buffer
+        parts.push(new Variables(vars,segs.splice(1)));
         
-          parts.push(v);
-        }
-        
-        index = recM.lastIndex;
-    }
-        
-    if(!index) {
-
-      // Match $var1|func
-      var re = /\$([_A-Za-z][_A-Za-z0-9.|]*)/g;
-      while (m = re.exec(str))
-      {
-          var pre = str.substr(index, (re.lastIndex-m[0].length)-index);
-          if (pre)
-              parts.push(pre);
-  
-          var expr = m[1].split("|");
-          parts.push(new Variable(expr[0], expr.slice(1)));
-          index = re.lastIndex;
-      }
+        index = re.lastIndex;
     }
 
     // No matches found at all so we return the whole string
@@ -975,8 +949,8 @@ function readPartNames(val, vars)
         for (var i = 0; i < val.parts.length; ++i)
         {
             var part = val.parts[i];
-            if (part instanceof Variable)
-                vars.push(part.name);
+            if (part instanceof Variables)
+                vars.push(part.names[0]);
         }
     }
 }
@@ -989,7 +963,7 @@ function generateArg(val, path, args)
         for (var i = 0; i < val.parts.length; ++i)
         {
             var part = val.parts[i];
-            if (part instanceof Variable)
+            if (part instanceof Variables)
             {
                 var varName = 'd'+path.renderIndex++;
                 if (part.format)
@@ -1021,9 +995,11 @@ function addParts(val, delim, block, info, escapeIt)
         for (var i = 0; i < val.parts.length; ++i)
         {
             var part = val.parts[i];
-            if (part instanceof Variable)
+            if (part instanceof Variables)
             {
-                var partName = part.name;
+                // Only grap one variable.
+                // This is fine as we are not passing it to a function and only displaying it.
+                var partName = part.names[0];
                 if (part.format)
                 {
                     for (var j = 0; j < part.format.length; ++j)

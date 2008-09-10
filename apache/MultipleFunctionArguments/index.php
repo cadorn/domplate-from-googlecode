@@ -49,10 +49,10 @@
   						TH('Col 1'),
   						TH('Col 2')
   					),				
-  					FOR('row','($value,$styles)|getRowData',
+  					FOR('row','$value,$styles|getRowData',
   						TR(
-      					FOR('row','($row.value,$row.style)|getRowData',
-	    						TD({'style':'background-color: $row.style.color'},'$row.value')					
+      					FOR('row','$row.value,$row.style|getRowData',
+	    						TD({'style':'background-color: $row.style.color'},'$row.value|wrap|wrap')					
                 )
   						)
   					)
@@ -69,7 +69,11 @@
 				}
 				return parts;				
         
-			}
+			},
+      
+      wrap: function(value) {
+        return '[' + value + ']';
+      }
 		
 		});
 		
@@ -95,10 +99,6 @@
                      ];
                        
 				formatter.table.append({value:rows, styles:styles}, $("test"));			
-
-//console.log(parseParts('bwyu4f4 $value|getRowData dsfsdf $value2|getRowData2 sdfsdfsdf'));
-//console.log(parseParts('bwyu4f4($value,$styles)|getRowData h478373hh ($value2,$styles2)|getRowData2 dsfsdf'));
-
 			}
 		
 		};
