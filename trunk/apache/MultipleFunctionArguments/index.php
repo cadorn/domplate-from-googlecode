@@ -58,7 +58,6 @@
   					)
           )						
 				),
-
 				
 			getRowData: function(value,styles){
 				
@@ -73,8 +72,39 @@
       
       wrap: function(value) {
         return '[' + value + ']';
-      }
+      },
 		
+
+      table2:
+        TABLE(
+          TBODY(
+            TR(
+              TH({'style':'background-color: gray;'},
+                 'Names')
+            ),				
+            FOR('row','$people|getRows',
+              TR(
+                TD({'style':'background-color: $row.color'},
+                   'Hello $row.name|formatName')
+              )
+            )
+          )
+        ),    
+        
+			getRows: function(data){
+				
+				var rows = [];
+				for (var i=0; i < data.length; i++) {
+						rows.push({
+                        name: data[i],
+                        color: (i%2==1)?'lightgray':'white'
+                      });
+				}
+				return rows;				
+			},
+      formatName: function(value) {
+        return value.substr(0, 1).toUpperCase() + value.substr(1);
+      }
 		});
 		
 		formatter = new Formatter();
@@ -99,6 +129,16 @@
                      ];
                        
 				formatter.table.append({value:rows, styles:styles}, $("test"));			
+        
+        var names = [
+                      'John Doe',
+                      'Brad Smith',
+                      'Susan Kent',
+                      'Tamara Clayton'
+                    ];
+
+				formatter.table2.append({people:names}, $("test2"));			
+        
 			}
 		
 		};
@@ -111,6 +151,10 @@
 <body>
 
 <div id="test"></div>
+
+<br>
+
+<div id="test2"></div>
 
 </body>
 </html>
