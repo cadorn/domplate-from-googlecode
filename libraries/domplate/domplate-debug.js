@@ -33,27 +33,38 @@ function DomplateLoop()
 top.DomplateDebug = {
   
   enabled: false,
+  console: console,
+  
+  setEnabled: function(enabled)
+  {
+      this.enabled = enabled;
+  },
+  
+  setConsole: function(console)
+  {
+      this.console = console;
+  },
   
   log: function(label, value)
   {
       if(!this.enabled) return;
       if(arguments.length==2) {
-        console.log(label+': ',value);
+        this.console.log(label+': ',value);
       } else {
-        console.log(label);
+        this.console.log(label);
       }
   },
   logVar: function(label, value)
   {
       if(!this.enabled) return;
-      console.log(label+': ',[value]);
+      this.console.log(label+': ',[value]);
   },
   logJs: function(label, value)
   {
       if(!this.enabled) return;
       value = value.replace(/;/g,';\n');
       value = value.replace(/{/g,'{\n');
-      console.info(value);
+      this.console.info(value);
   },
   reformatArguments: function(args)
   {
@@ -71,9 +82,9 @@ top.DomplateDebug = {
       if(!this.enabled) return;
       if(this.isArray(label)) {
         label.splice(1,0,' - ');
-        console.group.apply(this,label);
+        this.console.group.apply(this,label);
       }  else {
-        console.group(label);
+        this.console.group(label);
       } 
       if(args!=null) {
           this.logVar('ARGUMENTS',DomplateDebug.reformatArguments(args));
@@ -82,7 +93,7 @@ top.DomplateDebug = {
   endGroup: function()
   {
       if(!this.enabled) return;
-      console.groupEnd();
+      this.console.groupEnd();
   },
   isArray: function(obj) {
       if (obj.constructor.toString().indexOf("Array") != -1) {
