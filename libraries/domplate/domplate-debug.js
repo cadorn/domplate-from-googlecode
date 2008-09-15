@@ -1227,10 +1227,6 @@ var Renderer =
 
         DomplateDebug.logVar('html',html);
         
-console.log(parent);
-console.log(parent.id);
-console.log(parent.ownerDocument);
-
         if (!womb || womb.ownerDocument != parent.ownerDocument)
             womb = parent.ownerDocument.createElement("div");
 
