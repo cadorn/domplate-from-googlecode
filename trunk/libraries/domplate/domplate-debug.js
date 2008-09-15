@@ -96,7 +96,7 @@ top.DomplateDebug = {
 
 var womb = null;
 
-top.domplate = function()
+var domplate = top.domplate = function()
 {
     var lastSubject;
     for (var i = 0; i < arguments.length; ++i)
@@ -1227,6 +1227,10 @@ var Renderer =
 
         DomplateDebug.logVar('html',html);
         
+console.log(parent);
+console.log(parent.id);
+console.log(parent.ownerDocument);
+
         if (!womb || womb.ownerDocument != parent.ownerDocument)
             womb = parent.ownerDocument.createElement("div");
 
