@@ -66,6 +66,11 @@ DomplateDebug = {
       if(!this.enabled) return;
       this.console.log(label+': ',[value]);
   },
+  logInfo: function(message)
+  {
+      if(!this.enabled) return;
+      this.console.info(message);
+  },
   logJs: function(label, value)
   {
       if(!this.enabled) return;
@@ -267,20 +272,21 @@ DomplateTag.prototype =
             fnBlock.push(', s', i);
         fnBlock.push(') {');
 
-        fnBlock.push('DomplateDebug.startGroup([\' .. Run Markup .. \',\''+this.tagName+'\'],arguments);');
+        fnBlock.push('  DomplateDebug.startGroup([\' .. Run Markup .. \',\''+this.tagName+'\'],arguments);');
+        fnBlock.push('  DomplateDebug.logJs(\'js\',\'__SELF__JS__\');');
 
         if (this.subject)
-            fnBlock.push('with (this) {');
+            fnBlock.push('  with (this) {');
         if (this.context) 
-            fnBlock.push('with (__context__) {');
-        fnBlock.push('with (__in__) {');
+            fnBlock.push('  with (__context__) {');
+        fnBlock.push('  with (__in__) {');
 
         fnBlock.push.apply(fnBlock, blocks);
 
         if (this.subject)
-            fnBlock.push('}');
+            fnBlock.push('  }');
         if (this.context)
-            fnBlock.push('}');
+            fnBlock.push('  }');
 
         fnBlock.push('DomplateDebug.endGroup();');
 
@@ -349,9 +355,36 @@ DomplateTag.prototype =
             }
         }
 
+        function __if__(booleanVar, outputs, fn)
+        {
+            // "outputs" is what gets passed to the compiled DOM when it runs.
+            // It is used by the dom to make decisions as to how many times to
+            // run children for FOR loops etc ...
+            // For the IF feature we set a 1 or 0 depending on whether
+            // the sub template ran or not. If it did not run then no HTML
+            // markup was generated and accordingly the DOM elements should and
+            // can not be traversed.
+          
+            var ifControl = [];
+            outputs.push(ifControl);
+
+
+            DomplateDebug.logVar('j  .. booleanVar',booleanVar);
+
+            if(booleanVar) {
+              ifControl.push(1);
+              fn.apply(this, [ifControl]);
+            } else {
+              ifControl.push(0);
+            }
+        }
+
         var js = fnBlock.join("");
         
         DomplateDebug.logVar('js',js);
+
+        // Inject the compiled JS so we can view it later in the console when the code runs     
+        js = js.replace('__SELF__JS__',js.replace(/\'/g,'\\\''));
         
         this.renderMarkup = eval(js);
 
@@ -445,7 +478,7 @@ DomplateTag.prototype =
     addCode: function(topBlock, topOuts, blocks)
     {
         if (topBlock.length)
-            blocks.push('__code__.push(""', topBlock.join(""), ');');
+            blocks.push('    __code__.push(""', topBlock.join(""), ');');
         if (topOuts.length)
             blocks.push('__out__.push(', topOuts.join(","), ');');
         topBlock.splice(0, topBlock.length);
@@ -479,6 +512,7 @@ DomplateTag.prototype =
         this.domArgs = [];
         path.embedIndex = 0;
         path.loopIndex = 0;
+        path.ifIndex = 0;
         path.staticIndex = 0;
         path.renderIndex = 0;
         var nodeCount = this.generateDOM(path, blocks, this.domArgs);
@@ -497,6 +531,8 @@ DomplateTag.prototype =
         
         for (var i = 0; i < path.loopIndex; ++i)
             fnBlock.push('  var l', i, ' = 0;');
+        for (var i = 0; i < path.ifIndex; ++i)
+            fnBlock.push('  var if_', i, ' = 0;');
         for (var i = 0; i < path.embedIndex; ++i)
             fnBlock.push('  var e', i, ' = 0;');
 
@@ -549,6 +585,8 @@ DomplateTag.prototype =
         function __loop__(iter, fn)
         {
             DomplateDebug.startGroup('__loop__',arguments);
+            DomplateDebug.logVar('iter',iter);
+            DomplateDebug.logVar('fn',fn);
 
             var nodeCount = 0;
             for (var i = 0; i < iter.length; ++i)
@@ -556,11 +594,36 @@ DomplateTag.prototype =
                 iter[i][0] = i;
                 iter[i][1] = nodeCount;
                 nodeCount += fn.apply(this, iter[i]);
+    
+                DomplateDebug.logVar(' .. nodeCount',nodeCount);
             }
+
+            DomplateDebug.logVar('iter',iter);
 
             DomplateDebug.endGroup();
             
             return nodeCount;
+        }
+
+        function __if__(control, fn)
+        {
+            DomplateDebug.startGroup('__if__',arguments);
+            DomplateDebug.logVar('control',control);
+            DomplateDebug.logVar('fn',fn);
+
+            // Check the control structure to see if we should run the IF
+            if(control[0]) {
+              // Lets run it
+              // TODO: If in debug mode add info about the IF expression that caused the running
+              DomplateDebug.logInfo('Running IF');
+              fn.apply(this, [0,control[1]]);
+            } else {
+              // We need to skip it
+              // TODO: If in debug mode add info about the IF expression that caused the skip
+              DomplateDebug.logInfo('Skipping IF');
+            }
+    
+            DomplateDebug.endGroup();
         }
 
         function __path__(parent, offset)
@@ -687,6 +750,7 @@ DomplateEmbed.prototype = copyObject(DomplateTag.prototype,
         return retval;        
     },
 
+    // Used for locales only
     getVarNames: function(names)
     {
         if (this.value instanceof Parts)
@@ -767,6 +831,7 @@ DomplateLoop.prototype = copyObject(DomplateTag.prototype,
         return retval;
     },
 
+    // Used for locales only
     getVarNames: function(names)
     {
         if (this.iter instanceof Parts)
@@ -816,10 +881,10 @@ DomplateLoop.prototype = copyObject(DomplateTag.prototype,
         
         DomplateDebug.logVar('iterName',iterName);
 
-        blocks.push('__loop__.apply(this, [', iterName, ', __out__, function(', this.varName, ', __out__) {');
+        blocks.push('    __loop__.apply(this, [', iterName, ', __out__, function(', this.varName, ', __out__) {');
         this.generateChildMarkup(topBlock, topOuts, blocks, info);
         this.addCode(topBlock, topOuts, blocks);
-        blocks.push('}]);');
+        blocks.push('    }]);');
 
         DomplateDebug.endGroup();
     },
@@ -860,7 +925,8 @@ DomplateLoop.prototype = copyObject(DomplateTag.prototype,
             blocks.push(',d'+i);
         blocks.push(') {');
         
-        blocks.push('       DomplateDebug.logVar(\'  .. '+loopName+'\','+loopName+');');
+        blocks.push('       DomplateDebug.logVar(\'  .. '+counterName+' (counterName)\','+counterName+');');
+        blocks.push('       DomplateDebug.logVar(\'  .. '+loopName+' (loopName)\','+loopName+');');
         
         blocks.push(subBlocks.join(""));
         blocks.push('        return ', nodeCount, ';');
@@ -882,13 +948,14 @@ DomplateIf.prototype = copyObject(DomplateTag.prototype,
     {
         DomplateDebug.startGroup('DomplateIf.merge',arguments);
 
-        this.varName = oldTag ? oldTag.varName : args[0];
-        this.iter = oldTag ? oldTag.iter : parseValue(args[1]);
+        // This is the first argument to IF() which needs to evaluate to TRUE or FALSE
+        // It can be a plain variable or a variable with formatters chained to it
+        this.booleanVar = oldTag ? oldTag.booleanVar : parseValue(args[0]);
         this.vars = [];
 
         this.children = oldTag ? copyArray(oldTag.children) : [];
 
-        var offset = Math.min(args.length, 2);
+        var offset = Math.min(args.length, 1);
         parseChildren(args, offset, this.vars, this.children);
 
         var retval = creator(this, DomplateIf);
@@ -898,10 +965,11 @@ DomplateIf.prototype = copyObject(DomplateTag.prototype,
         return retval;
     },
 
+    // Used for locales only
     getVarNames: function(names)
     {
-        if (this.iter instanceof Parts)
-            names.push(this.iter.parts[0].name);
+        if (this.booleanVar instanceof Parts)
+            names.push(this.booleanVar.parts[0].name);
 
         DomplateTag.prototype.getVarNames.apply(this, [names]);
     },
@@ -912,25 +980,21 @@ DomplateIf.prototype = copyObject(DomplateTag.prototype,
 
         this.addCode(topBlock, topOuts, blocks);
 
-        DomplateDebug.logVar('this.iter',this.iter);
+        DomplateDebug.logVar('this.booleanVar',this.booleanVar);
 
-        // We are in a FOR loop and our this.iter property contains
-        // either a simple function name as a string or a Parts object
-        // with only ONE Variables object. There is only one variables object
-        // as the FOR argument can contain only ONE valid function callback
-        // with optional arguments or just one variable. Allowed arguments are
-        // func or $var or $var.sub or $var|func or $var1,$var2|func or $var|func1|func2 or $var1,$var2|func1|func2
-        var iterName;
-        if (this.iter instanceof Parts)
+
+        // Generate the expression to be used for the if(expr) { ... }
+        var expr;
+        if (this.booleanVar instanceof Parts)
         {
             // We have a function with optional aruments or just one variable
-            var part = this.iter.parts[0];
+            var part = this.booleanVar.parts[0];
             
             // Join our function arguments or variables
             // If the user has supplied multiple variables without a function
             // this will create an invalid result and we should probably add an
             // error message here or just take the first variable
-            iterName = part.names.join(',');
+            expr = part.names.join(',');
 
             // Nest our functions
             if (part.format)
@@ -938,16 +1002,16 @@ DomplateIf.prototype = copyObject(DomplateTag.prototype,
                 DomplateDebug.logVar('part.format',part.format);
         
                 for (var i = 0; i < part.format.length; ++i)
-                    iterName = part.format[i] + "(" + iterName + ")";
+                    expr = part.format[i] + "(" + expr + ")";
             }
         } else {
             // We have just a simple function name without any arguments
-            iterName = this.iter;
+            expr = this.booleanVar;
         }
         
-        DomplateDebug.logVar('iterName',iterName);
+        DomplateDebug.logVar('expr',expr);
 
-        blocks.push('__loop__.apply(this, [', iterName, ', __out__, function(', this.varName, ', __out__) {');
+        blocks.push('__if__.apply(this, [', expr, ', __out__, function(__out__) {');
         this.generateChildMarkup(topBlock, topOuts, blocks, info);
         this.addCode(topBlock, topOuts, blocks);
         blocks.push('}]);');
@@ -959,9 +1023,8 @@ DomplateIf.prototype = copyObject(DomplateTag.prototype,
     {
         DomplateDebug.startGroup('DomplateIf.generateDOM',arguments);
 
-        var iterName = 'd'+path.renderIndex++;
-        var counterName = 'i'+path.loopIndex;
-        var loopName = 'l'+path.loopIndex++;
+        var controlName = 'd'+path.renderIndex++;
+        var ifName = 'if_'+path.ifIndex++;
 
         if (!path.length)
             path.push(-1, 0);
@@ -972,10 +1035,11 @@ DomplateIf.prototype = copyObject(DomplateTag.prototype,
         var nodeCount = 0;
 
         var subBlocks = [];
-        var basePath = path[path.length-1];
+//        var basePath = path[path.length-1];
+
         for (var i = 0; i < this.children.length; ++i)
         {
-            path[path.length-1] = basePath+'+'+loopName+'+'+nodeCount;
+//            path[path.length-1] = basePath+'+'+ifName+'+'+nodeCount;
 
             var child = this.children[i];
             if (isTag(child))
@@ -984,24 +1048,25 @@ DomplateIf.prototype = copyObject(DomplateTag.prototype,
                 nodeCount += '+1';
         }
 
-        path[path.length-1] = basePath+'+'+loopName;
+//        path[path.length-1] = basePath+'+'+ifName;
 
-        blocks.push('      ',loopName,' = __loop__.apply(this, [', iterName, ', function(', counterName,',',loopName);
+        blocks.push('      ',ifName,' = __if__.apply(this, [', controlName, ', function(',ifName);
         for (var i = 0; i < path.renderIndex; ++i)
             blocks.push(',d'+i);
         blocks.push(') {');
         
-        blocks.push('       DomplateDebug.logVar(\'  .. '+loopName+'\','+loopName+');');
+        blocks.push('       DomplateDebug.logVar(\'  .. d0\',d0);');
+        blocks.push('       DomplateDebug.logVar(\'  .. '+ifName+' (ifName)\','+ifName+');');
         
         blocks.push(subBlocks.join(""));
-        blocks.push('        return ', nodeCount, ';');
+//        blocks.push('        return ', nodeCount, ';');
         blocks.push('      }]);');
 
         path.renderIndex = preIndex;
 
         DomplateDebug.endGroup();
 
-        return loopName;
+        return controlName;
     }
 });
 
@@ -1371,6 +1436,8 @@ var Renderer =
 
         var outputs = [];
         var html = this.renderHTML(args, outputs, self);
+
+        DomplateDebug.logVar('outputs',outputs);
 
         DomplateDebug.logVar('html',html);
         
